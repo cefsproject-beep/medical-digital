@@ -111,33 +111,27 @@
             display: none !important;
         }
         
-        #scan-indicator {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 250px;
-            height: 250px;
-            border: 3px solid #27ae60;
-            border-radius: 10px;
-            pointer-events: none;
-            display: none;
+        .scanning-text {
+            text-align: center;
+            color: #666;
+            margin-top: 10px;
+            font-size: 0.9rem;
         }
         
-        .scanner-active #scan-indicator {
-            display: block;
-            animation: pulse 2s infinite;
+        .scanner-active .scanning-text {
+            color: #27ae60;
+            font-weight: 600;
         }
         
-        @keyframes pulse {
-            0% { border-color: #27ae60; }
-            50% { border-color: #2ecc71; }
-            100% { border-color: #27ae60; }
+        .scanner-active .scanning-text::after {
+            content: ' •';
+            animation: dots 1.5s infinite;
         }
         
-        .video-container {
-            position: relative;
-            display: inline-block;
+        @keyframes dots {
+            0%, 20% { content: ' •'; }
+            40% { content: ' • •'; }
+            60%, 100% { content: ' • • •'; }
         }
     </style>
     <!-- Include jsQR Library -->
@@ -146,7 +140,7 @@
 <body>
     <div class="header">
         <h1>Scan Patient QR Code</h1>
-        <p>Point camera at QR code to scan</p>
+        <p>Point camera at QR code</p>
     </div>
     
     <div class="container">
@@ -171,13 +165,13 @@
         <!-- Camera Scanner -->
         <div id="scanner-container" class="card hidden">
             <h3 style="margin-bottom: 15px;">Camera Scanner</h3>
-            <div class="video-container">
-                <video id="video" playsinline></video>
-                <div id="scan-indicator"></div>
-            </div>
-            <p class="info" id="scan-hint">
-                <i class="fas fa-lightbulb"></i> Position QR code within the green box
+            <video id="video" playsinline></video>
+            <div class="scanning-text" id="scanning-text">Ready to scan</div>
+            
+            <p class="info">
+                <i class="fas fa-lightbulb"></i> Tip: Hold phone steady and ensure QR code is clear
             </p>
+            
             <button class="btn btn-secondary" onclick="stopCamera()" style="margin-top: 15px;">
                 <i class="fas fa-times"></i> Stop Camera
             </button>
@@ -188,21 +182,14 @@
             <div id="status-content"></div>
         </div>
         
-        <!-- Debug Info (optional - boleh hide dalam production) -->
-        <div id="debug-info" class="card hidden" style="font-size: 0.8rem; color: #666;">
-            <h4>Debug Info:</h4>
-            <div id="debug-content"></div>
-        </div>
-        
         <!-- Instructions -->
         <div class="card">
             <h3 style="margin-bottom: 15px;">Tips for Better Scanning:</h3>
             <ul style="padding-left: 20px; color: #666;">
                 <li>Ensure good lighting</li>
                 <li>Hold phone steady</li>
-                <li>Position QR code within the green box</li>
-                <li>Keep QR code parallel to camera</li>
-                <li>If scanning fails, try uploading an image instead</li>
+                <li>Move closer if QR code is small</li>
+                <li>If scanning fails, try uploading an image</li>
             </ul>
         </div>
     </div>
@@ -225,7 +212,7 @@
                 cameraBtn.disabled = true;
                 cameraBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Camera...';
                 
-                // Request camera access with better constraints
+                // Request camera access
                 const constraints = {
                     video: {
                         facingMode: "environment",
@@ -245,16 +232,17 @@
                 video.onloadedmetadata = () => {
                     video.play();
                     
-                    // Start scanning after video is playing
+                    // Start scanning
                     setTimeout(() => {
                         startScanning();
                         cameraBtn.innerHTML = '<i class="fas fa-camera"></i> Scan Using Camera';
                         cameraBtn.disabled = false;
                         
-                        // Add scanning class for visual indicator
-                        document.querySelector('.video-container').classList.add('scanner-active');
+                        // Update scanning text
+                        document.getElementById('scanning-text').textContent = 'Scanning...';
+                        scannerContainer.classList.add('scanner-active');
                         isScanning = true;
-                    }, 1000);
+                    }, 500);
                 };
                 
             } catch (error) {
@@ -279,34 +267,33 @@
             }
             
             scanInterval = setInterval(() => {
-                if (!isScanning) return;
+                if (!isScanning || !video.videoWidth) return;
                 
-                if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
-                    // Set canvas dimensions to video dimensions
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    
-                    // Draw video frame to canvas
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    
-                    // Get image data
-                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    // Try to decode QR code
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                // Set canvas to video dimensions
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                // Draw video frame
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Get image data
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // Try to decode QR code - FIXED: image.height -> imageData.height
+                const code = jsQR(
+                    imageData.data, 
+                    imageData.width, 
+                    imageData.height,  // <-- FIXED HERE
+                    {
                         inversionAttempts: "dontInvert",
-                    });
-                    
-                    // Update debug info
-                    updateDebugInfo(`Scanning... Video: ${canvas.width}x${canvas.height}`);
-                    
-                    if (code) {
-                        console.log("QR Code detected:", code.data);
-                        updateDebugInfo(`QR Found: ${code.data.substring(0, 50)}...`);
-                        handleScannedCode(code.data);
                     }
+                );
+                
+                if (code) {
+                    console.log("QR Code detected:", code.data);
+                    handleScannedCode(code.data);
                 }
-            }, 200); // Scan every 200ms (faster)
+            }, 300); // Scan every 300ms
         }
         
         // Handle file upload
@@ -330,11 +317,16 @@
                     const context = canvas.getContext('2d');
                     context.drawImage(img, 0, 0);
                     
-                    // Decode QR
+                    // Decode QR - FIXED: img.height -> canvas.height
                     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "dontInvert",
-                    });
+                    const code = jsQR(
+                        imageData.data, 
+                        imageData.width, 
+                        imageData.height,  // <-- FIXED HERE
+                        {
+                            inversionAttempts: "dontInvert",
+                        }
+                    );
                     
                     if (code) {
                         handleScannedCode(code.data);
@@ -360,13 +352,12 @@
                 const data = JSON.parse(qrData);
                 
                 if (!data.firebaseId) {
-                    showError("Invalid QR code format. Missing firebaseId");
+                    showError("Invalid QR code format");
                     return;
                 }
                 
                 // Stop scanning
                 isScanning = false;
-                document.querySelector('.video-container').classList.remove('scanner-active');
                 
                 // Stop camera if active
                 if (videoStream) {
@@ -378,7 +369,7 @@
                 
             } catch (error) {
                 console.error("QR parse error:", error);
-                showError("Invalid QR code format. Please ensure it's a valid Medical QR code.");
+                showError("Invalid QR code. Please scan a valid Medical QR code.");
             }
         }
         
@@ -392,15 +383,14 @@
             statusDiv.classList.remove('error');
             statusDiv.classList.add('success');
             
-            let countdown = 2; // Redirect in 2 seconds
+            let countdown = 1; // Redirect in 1 second (lebih cepat!)
             
             // Display success message
             statusContent.innerHTML = `
                 <div style="text-align: center;">
                     <i class="fas fa-check-circle fa-2x" style="color: #27ae60; margin-bottom: 10px;"></i>
-                    <h3>QR Code Scanned Successfully!</h3>
-                    <p>Patient ID: ${data.patientId || 'N/A'}</p>
-                    <div class="countdown">Redirecting in <span id="countdown-number">${countdown}</span> seconds...</div>
+                    <h3>QR Code Scanned!</h3>
+                    <div class="countdown">Redirecting in <span id="countdown-number">${countdown}</span> second...</div>
                 </div>
             `;
             
@@ -441,21 +431,10 @@
             `;
         }
         
-        // Update debug info
-        function updateDebugInfo(message) {
-            const debugDiv = document.getElementById('debug-info');
-            const debugContent = document.getElementById('debug-content');
-            
-            // Uncomment untuk show debug info
-            // debugDiv.classList.remove('hidden');
-            debugContent.textContent = message + ' | ' + new Date().toLocaleTimeString();
-        }
-        
         // Retry scanning
         function retryScan() {
             document.getElementById('scan-status').classList.add('hidden');
             lastScannedCode = null;
-            isScanning = true;
             
             if (redirectCountdown) {
                 clearInterval(redirectCountdown);
@@ -465,8 +444,9 @@
             // Restart camera if it was active
             const scannerContainer = document.getElementById('scanner-container');
             if (!scannerContainer.classList.contains('hidden')) {
-                document.querySelector('.video-container').classList.add('scanner-active');
-                startScanning();
+                isScanning = true;
+                scannerContainer.classList.add('scanner-active');
+                document.getElementById('scanning-text').textContent = 'Scanning...';
             }
         }
         
@@ -486,8 +466,9 @@
                 scanInterval = null;
             }
             
-            document.getElementById('scanner-container').classList.add('hidden');
-            document.querySelector('.video-container').classList.remove('scanner-active');
+            const scannerContainer = document.getElementById('scanner-container');
+            scannerContainer.classList.add('hidden');
+            scannerContainer.classList.remove('scanner-active');
             
             // Re-enable camera button
             const cameraBtn = document.getElementById('camera-btn');
@@ -502,16 +483,6 @@
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('auto') === 'true') {
             setTimeout(startCameraScan, 1000);
-        }
-        
-        // Test with sample QR (for debugging)
-        function testWithSampleQR() {
-            const sampleData = {
-                firebaseId: "test-patient-123",
-                patientId: "PAT-TEST-001",
-                hasPassword: true
-            };
-            handleScannedCode(JSON.stringify(sampleData));
         }
     </script>
     
