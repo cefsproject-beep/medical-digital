@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical QR System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Code Library -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- Firebase SDK v9 (Modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTUX8yNtCGEeSznE0X5ge_3-daN-P9As0",
+            authDomain: "medic-df320.firebaseapp.com",
+            projectId: "medic-df320",
+            storageBucket: "medic-df320.firebasestorage.app",
+            messagingSenderId: "498120947506",
+            appId: "1:498120947506:web:72ec863beefd537a0f892b",
+            measurementId: "G-YL18C7469T"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // Make Firebase available globally
+        window.firebaseDB = db;
+        window.firebaseCollection = collection;
+        window.firebaseAddDoc = addDoc;
+        window.firebaseGetDocs = getDocs;
+        window.firebaseDoc = doc;
+        window.firebaseGetDoc = getDoc;
+        window.firebaseUpdateDoc = updateDoc;
+        window.firebaseDeleteDoc = deleteDoc;
+        window.firebaseServerTimestamp = serverTimestamp;
+        
+        console.log("✅ Firebase v9 initialized successfully!");
+    </script>
+    
+    <style>
+        /* Mobile First Design */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            min-height: 100vh;
+            padding: 0;
+            margin: 0;
+            overflow-x: hidden;
+        }
+        
+        .app-container {
+            width: 100%;
+            min-height: 100vh;
+            background: white;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+            color: white;
+            padding: 20px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 5px;
+            margin: 15px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 10px;
+            border: none;
+            background: transparent;
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: #666;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+            white-space: nowrap;
+        }
+        
+        .tab-btn.active {
+            background: white;
+            color: #3498db;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            font-weight: 600;
+        }
+        
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+            padding: 0 15px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Forms */
+        .form-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 15px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            border: 1px solid #eaeaea;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #2c3e50;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: #fafafa;
+            transition: border-color 0.3s;
+                }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+            font-family: inherit;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .btn:hover, .btn:active {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        .btn-success {
+            background: #27ae60;
+        }
+        
+        .btn-success:hover {
+            background: #219653;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        /* QR Container */
+        .qr-container {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            background: #f8f9fa;
+            border: 2px dashed #ddd;
+        }
+        
+        #qrcode {
+            margin: 15px auto;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        
+        /* Patients Table */
+        .patients-table-container {
+            margin-top: 20px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        th {
+            background: #3498db;
+            color: white;
+            padding: 15px 10px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+        
+        td {
+            padding: 12px 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 0.85rem;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .action-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: opacity 0.3s;
+        }
+        
+        .action-btn:hover {
+            opacity: 0.9;
+        }
+        
+        .btn-edit {
+            background: #f39c12;
+            color: white;
+        }
+        
+        .btn-delete {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-qr {
+            background: #27ae60;
+            color: white;
+        }
+        
+        /* QR Popup */
+        .qr-popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        
+        .qr-popup.active {
+            display: flex;
+        }
+        
+        .qr-popup-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .qr-popup-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        /* Loading & Messages */
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        
+        /* Responsive */
+        @media (max-width: 480px) {
+            .header {
+                padding: 15px;
+            }
+            
+            .header h1 {
+                font-size: 1.2rem;
+            }
+            
+            .tabs {
+                margin: 10px;
+            }
+            
+            .tab-btn {
+                min-width: 100px;
+                padding: 10px 8px;
+                font-size: 0.85rem;
+            }
+            
+            .form-card {
+                padding: 15px;
+            }
+            
+            input, select, textarea {
+                padding: 12px;
+            }
+            
+            .btn {
+                padding: 14px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+                font-size: 0.8rem;
+            }
+        }
+        
+        /* Hide elements */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <h1><center>Medical QR System</center></h1>
+            <p><center>Manage the patient information via QR in easier way</center></p>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('addPatient')"> Add Patient</button>
+            <button class="tab-btn" onclick="switchTab('patientsList')"> Patients List</button>
+            <button class="tab-btn" onclick="switchTab('scanQR')"> Scan QR</button>
+        </div>
+        
+        <!-- Tab 1: Add Patient -->
+        <div id="addPatientTab" class="tab-content active">
+            <div class="form-card">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">Add New Patient</h2>
+                
+                <form id="patientForm">
+                    <div class="form-group">
+                        <label for="name">Patient Name *</label>
+                        <input type="text" id="name" placeholder="Enter full name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="condition">Medical Condition *</label>
+                        <textarea id="condition" placeholder="Enter medical conditions, allergies, etc." required></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bloodType">Blood Type *</label>
+                        <select id="bloodType" required>
+                            <option value="">Select Blood Type</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="nok">Emergency Contact *</label>
+                        <input type="text" id="nok" placeholder="Name - Phone Number" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="qrPassword">Authentication Password *</label>
+                        <input type="password" id="qrPassword" placeholder="Leave empty for no password">
+                        <small style="color: #666; font-size: 0.85rem; display: block; margin-top: 5px;">
+                            Add password to protect patient data when scanning
+                        </small>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success" onclick="savePatient()">
+                        <i class="fas fa-save"></i> Save Patient
+                    </button>
+                    
+                    <div id="saveStatus"></div>
+                </form>
+            </div>
+            
+            <!-- QR Display -->
+            <div id="qrDisplay" class="qr-container hidden">
+                <h3 style="margin-bottom: 15px; color: #2c3e50;">Patient QR Code</h3>
+                <div id="qrcode"></div>
+                <p id="qrInfo" style="color: #666; margin: 10px 0; font-size: 0.9rem;"></p>
+                <button class="btn btn-secondary" onclick="hideQR()">
+                    <i class="fas fa-times"></i> Close QR
+                </button>
+                <button class="btn" onclick="printQR()" style="margin-top: 10px;">
+                    <i class="fas fa-print"></i> Print QR
+                </button>
+            </div>
+        </div>
+        
+        <!-- Tab 2: Patients List -->
+        <div id="patientsListTab" class="tab-content">
+            <div class="form-card">
+                <div class="table-header">
+                    <h2 style="color: #2c3e50;">Patients List</h2>
+                    <button class="btn btn-secondary" onclick="loadPatients()" style="width: auto; padding: 10px 15px;">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                
+                <div id="loadingPatients" class="loading">
+                    <i class="fas fa-spinner fa-spin"></i> Loading patients...
+                </div>
+                
+                <div id="noPatients" class="hidden" style="text-align: center; padding: 40px; color: #666;">
+                    <i class="fas fa-user-injured fa-2x" style="margin-bottom: 15px;"></i>
+                    <p>No patients found. Add your first patient!</p>
+                </div>
+                
+                <div id="patientsTableContainer" class="patients-table-container hidden">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Condition</th>
+                                <th>Blood Type</th>
+                                <th>Emergency Contact</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patientsTableBody">
+                            <!-- Patients will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Tab 3: Scan QR -->
+        <div id="scanQRTab" class="tab-content">
+            <div class="form-card">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">Scan Patient QR Code</h2>
+                
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <i class="fas fa-qrcode fa-3x" style="color: #3498db; margin-bottom: 15px;"></i>
+                    <p style="color: #666;">Scan will redirect to scan.html</p>
+                </div>
+                
+                <button class="btn" onclick="redirectToScanner()">
+                    <i class="fas fa-external-link-alt"></i> Go to Scanner Page
+                </button>
+                
+                <div id="scanInfo" style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <h4 style="margin-bottom: 10px; color: #2c3e50;">How to Scan:</h4>
+                    <ol style="padding-left: 20px; color: #666;">
+                        <li>Go to scanner page</li>
+                        <li>Allow camera permission</li>
+                        <li>Point camera at QR code</li>
+                        <li>View patient information</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QR Popup -->
+    <div class="qr-popup" id="qrPopup">
+        <div class="qr-popup-content">
+            <h3 id="qrPopupTitle">QR Code</h3>
+            <div id="qrPopupCode" style="margin: 20px 0;"></div>
+            <p id="qrPopupInfo" style="color: #666; margin-bottom: 20px;"></p>
+            <div class="qr-popup-actions">
+                <button class="btn" onclick="downloadQR()">
+                    <i class="fas fa-download"></i> Download
+                </button>
+                <button class="btn btn-secondary" onclick="closeQRPopup()">
+                    <i class="fas fa-times"></i> Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentEditingId = null;
+        let qrCodeInstance = null;
+        let firebaseReady = false;
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("🚀 Medical QR System Loading...");
+            
+            // Check Firebase every 500ms until ready
+            const checkFirebaseInterval = setInterval(() => {
+                if (window.firebaseDB) {
+                    firebaseReady = true;
+                    clearInterval(checkFirebaseInterval);
+                    console.log("✅ Firebase is ready!");
+                    
+                    // Auto-load patients if on patients list tab
+                    if (document.getElementById('patientsListTab').classList.contains('active')) {
+                        loadPatients();
+                    }
+                }
+            }, 500);
+        });
+        
+        // Check Firebase status
+        function checkFirebaseStatus() {
+            if (!firebaseReady) {
+                showMessage('Firebase not initialized. Please wait...', 'error');
+                return false;
+            }
+            return true;
+        }
+        
+        // Switch tabs
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.add('active');
+            
+            // Activate corresponding button
+            const tabs = ['addPatient', 'patientsList', 'scanQR'];
+            const index = tabs.indexOf(tabName);
+            if (index !== -1) {
+                document.querySelectorAll('.tab-btn')[index].classList.add('active');
+            }
+            
+            // Load patients if switching to patients list
+            if (tabName === 'patientsList') {
+                loadPatients();
+            }
+        }
+        
+        // Save patient to Firebase
+        async function savePatient() {
+            if (!checkFirebaseStatus()) return;
+            
+            const name = document.getElementById('name').value.trim();
+            const condition = document.getElementById('condition').value.trim();
+            const bloodType = document.getElementById('bloodType').value;
+            const nok = document.getElementById('nok').value.trim();
+            const password = document.getElementById('qrPassword').value.trim();
+            
+            // Validation
+            if (!name || !condition || !bloodType || !nok) {
+                showMessage('Please fill all required fields', 'error');
+                return;
+            }
+            
+            // Generate unique ID
+            const patientId = 'PAT-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5).toUpperCase();
+            
+            // Patient data
+            const patientData = {
+                id: patientId,
+                name: name,
+                condition: condition,
+                bloodType: bloodType,
+                nok: nok,
+                password: password || null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            // Show loading
+            const saveBtn = document.querySelector('#addPatientTab .btn');
+            const originalText = saveBtn.innerHTML;
+            saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+            saveBtn.disabled = true;
+            
+            try {
+                // Save to Firebase
+                const docRef = await window.firebaseAddDoc(
+                    window.firebaseCollection(window.firebaseDB, "patients"), 
+                    patientData
+                );
+                
+                console.log("✅ Patient saved with ID:", docRef.id);
+                
+                // Add Firebase ID
+                patientData.firebaseId = docRef.id;
+                
+                // Show success message
+                showMessage('✅ Patient saved successfully!', 'success');
+                
+                // Clear form
+                document.getElementById('patientForm').reset();
+                
+                // Generate and show QR code
+                generateQRCode(patientData);
+                
+                // Switch to QR display
+                document.getElementById('qrDisplay').classList.remove('hidden');
+                
+                // Auto scroll to QR
+                setTimeout(() => {
+                    document.getElementById('qrDisplay').scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+                
+                // Reset edit mode if was editing
+                if (currentEditingId) {
+                    cancelEdit();
+                }
+                
+            } catch (error) {
+                console.error("❌ Error saving patient:", error);
+                
+                if (error.code === 'permission-denied') {
+                    showMessage('❌ Permission denied! Please check Firebase Firestore rules.', 'error');
+                } else {
+                    showMessage('Error saving patient: ' + error.message, 'error');
+                }
+            } finally {
+                // Reset button
+                saveBtn.innerHTML = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+        
+        // Generate QR Code
+        function generateQRCode(patientData) {
+            // Create QR data with Firebase ID
+            const qrData = JSON.stringify({
+                firebaseId: patientData.firebaseId,
+                patientId: patientData.id,
+                hasPassword: !!patientData.password
+            });
+            
+            // Clear previous QR
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            
+            // Generate QR
+            qrCodeInstance = new QRCode(qrContainer, {
+                text: qrData,
+                width: 200,
+                height: 200,
+                colorDark: "#000000",
+                colorLight: "#FFFFFF",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // Update info
+            document.getElementById('qrInfo').textContent = 
+                `Patient: ${patientData.name} | ID: ${patientData.id}`;
+            
+            // Store current patient
+            currentEditingId = patientData.firebaseId;
+        }
+        
+        // Hide QR display
+        function hideQR() {
+            document.getElementById('qrDisplay').classList.add('hidden');
+            currentEditingId = null;
+        }
+        
+        // Print QR
+        function printQR() {
+            const qrImage = document.querySelector('#qrcode img');
+            if (qrImage) {
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(`
+                `);
+                printWindow.document.close();
+                printWindow.print();
+            }
+        }
+        
+        // Load patients from Firebase
+        async function loadPatients() {
+            if (!checkFirebaseStatus()) return;
+            
+            const loadingDiv = document.getElementById('loadingPatients');
+            const noPatientsDiv = document.getElementById('noPatients');
+            const tableContainer = document.getElementById('patientsTableContainer');
+            const tableBody = document.getElementById('patientsTableBody');
+            
+            loadingDiv.classList.remove('hidden');
+            noPatientsDiv.classList.add('hidden');
+            tableContainer.classList.add('hidden');
+            tableBody.innerHTML = '';
+            
+            try {
+                const querySnapshot = await window.firebaseGetDocs(
+                    window.firebaseCollection(window.firebaseDB, "patients")
+                );
+                
+                loadingDiv.classList.add('hidden');
+                
+                if (querySnapshot.empty) {
+                    noPatientsDiv.classList.remove('hidden');
+                    return;
+                }
+                
+                tableContainer.classList.remove('hidden');
+                let html = '';
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const id = doc.id;
+                    
+                    // Format date if exists
+                    let dateStr = 'N/A';
+                    if (data.createdAt) {
+                        const date = new Date(data.createdAt);
+                        dateStr = date.toLocaleDateString('en-US', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric'
+                        });
+                    }
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <strong>${data.name || 'Unknown'}</strong>
+                                <br><small style="color: #666; font-size: 0.8rem;">ID: ${data.id || 'N/A'}</small>
+                            </td>
+                            <td>${data.condition || 'N/A'}</td>
+                            <td><span style="color: #e74c3c; font-weight: bold;">${data.bloodType || 'N/A'}</span></td>
+                            <td>${data.nok || 'N/A'}</td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="action-btn btn-edit" onclick="editPatient('${id}')">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="action-btn btn-qr" onclick="showQRPopup('${id}', '${data.name || 'Patient'}')">
+                                        <i class="fas fa-qrcode"></i> QR
+                                    </button>
+                                    <button class="action-btn btn-delete" onclick="deletePatient('${id}', '${data.name || 'this patient'}')">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                tableBody.innerHTML = html;
+                
+            } catch (error) {
+                console.error("❌ Error loading patients:", error);
+                loadingDiv.classList.add('hidden');
+                showMessage('Error loading patients: ' + error.message, 'error');
+            }
+        }
+        
+        // Edit patient
+        async function editPatient(firebaseId) {
+            if (!checkFirebaseStatus()) return;
+            
+            try {
+                const docRef = window.firebaseDoc(window.firebaseDB, "patients", firebaseId);
+                const docSnap = await window.firebaseGetDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // Fill form with patient data
+                    document.getElementById('name').value = data.name || '';
+                    document.getElementById('condition').value = data.condition || '';
+                    document.getElementById('bloodType').value = data.bloodType || '';
+                    document.getElementById('nok').value = data.nok || '';
+                    document.getElementById('qrPassword').value = data.password || '';
+                    
+                    // Change button text
+                    const saveBtn = document.querySelector('#addPatientTab .btn');
+                    saveBtn.innerHTML = '<i class="fas fa-save"></i> Update Patient';
+                    saveBtn.onclick = function() { updatePatient(firebaseId); };
+                    
+                    // Add cancel button if not exists
+                    if (!document.getElementById('cancelEditBtn')) {
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.id = 'cancelEditBtn';
+                        cancelBtn.className = 'btn btn-danger';
+                        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel Edit';
+                        cancelBtn.onclick = cancelEdit;
+                        document.getElementById('patientForm').appendChild(cancelBtn);
+                    }
+                    
+                    // Set current editing ID
+                    currentEditingId = firebaseId;
+                    
+                    // Scroll to form
+                    switchTab('addPatient');
+                    setTimeout(() => {
+                        document.getElementById('addPatientTab').scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                    
+                    showMessage('Edit mode: ' + data.name, 'success');
+                } else {
+                    showMessage('Patient data not found', 'error');
+                }
+            } catch (error) {
+                console.error("❌ Error loading patient:", error);
+                showMessage('Error loading patient: ' + error.message, 'error');
+            }
+        }
+        
+        // Update patient
+        async function updatePatient(firebaseId) {
+            if (!checkFirebaseStatus()) return;
+            
+            const name = document.getElementById('name').value.trim();
+            const condition = document.getElementById('condition').value.trim();
+            const bloodType = document.getElementById('bloodType').value;
+            const nok = document.getElementById('nok').value.trim();
+            const password = document.getElementById('qrPassword').value.trim();
+            
+            if (!name || !condition || !bloodType || !nok) {
+                showMessage('Please fill all required fields', 'error');
+                return;
+            }
+            
+            const updateData = {
+                name: name,
+                condition: condition,
+                bloodType: bloodType,
+                nok: nok,
+                password: password || null,
+                updatedAt: new Date().toISOString()
+            };
+            
+            try {
+                const docRef = window.firebaseDoc(window.firebaseDB, "patients", firebaseId);
+                await window.firebaseUpdateDoc(docRef, updateData);
+                
+                showMessage('✅ Patient updated successfully!', 'success');
+                
+                // Reset form and buttons
+                document.getElementById('patientForm').reset();
+                cancelEdit();
+                
+                // Reload patients list
+                loadPatients();
+                
+            } catch (error) {
+                console.error("❌ Error updating patient:", error);
+                showMessage('Error updating patient: ' + error.message, 'error');
+            }
+        }
+        
+        // Cancel edit
+        function cancelEdit() {
+            document.getElementById('patientForm').reset();
+            
+            // Reset button
+            const saveBtn = document.querySelector('#addPatientTab .btn');
+            saveBtn.innerHTML = '<i class="fas fa-save"></i> Save Patient';
+            saveBtn.onclick = savePatient;
+            
+            // Remove cancel button
+            const cancelBtn = document.getElementById('cancelEditBtn');
+            if (cancelBtn) {
+                cancelBtn.remove();
+            }
+            
+            currentEditingId = null;
+        }
+        
+        // Delete patient
+        async function deletePatient(firebaseId, patientName) {
+            if (!confirm(`Are you sure you want to delete patient: ${patientName}?`)) {
+                return;
+            }
+            
+            if (!checkFirebaseStatus()) return;
+            
+            try {
+                const docRef = window.firebaseDoc(window.firebaseDB, "patients", firebaseId);
+                await window.firebaseDeleteDoc(docRef);
+                
+                showMessage('✅ Patient deleted successfully!', 'success');
+                loadPatients();
+                
+            } catch (error) {
+                console.error("❌ Error deleting patient:", error);
+                showMessage('Error deleting patient: ' + error.message, 'error');
+            }
+        }
+        
+        // Show QR Popup
+        async function showQRPopup(firebaseId, patientName) {
+            if (!checkFirebaseStatus()) return;
+            
+            try {
+                const docRef = window.firebaseDoc(window.firebaseDB, "patients", firebaseId);
+                const docSnap = await window.firebaseGetDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    
+                    // Generate QR data
+                    const qrData = JSON.stringify({
+                        firebaseId: firebaseId,
+                        patientId: data.id,
+                        hasPassword: !!data.password
+                    });
+                    
+                    // Clear and generate QR
+                    const qrContainer = document.getElementById('qrPopupCode');
+                    qrContainer.innerHTML = '';
+                    
+                    new QRCode(qrContainer, {
+                        text: qrData,
+                        width: 250,
+                        height: 250,
+                        colorDark: "#000000",
+                        colorLight: "#FFFFFF",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    
+                    // Update popup info
+                    document.getElementById('qrPopupTitle').textContent = `QR Code - ${patientName}`;
+                    document.getElementById('qrPopupInfo').textContent = 
+                        `Patient ID: ${data.id} | Blood Type: ${data.bloodType}`;
+                    
+                    // Store current data for download
+                    window.currentQRData = { data: qrData, name: patientName };
+                    
+                    // Show popup
+                    document.getElementById('qrPopup').classList.add('active');
+                }
+            } catch (error) {
+                console.error("❌ Error generating QR:", error);
+                showMessage('Error generating QR: ' + error.message, 'error');
+            }
+        }
+        
+        // Close QR Popup
+        function closeQRPopup() {
+            document.getElementById('qrPopup').classList.remove('active');
+        }
+        
+        // Download QR
+        function downloadQR() {
+            const qrImage = document.querySelector('#qrPopupCode img');
+            if (!qrImage) {
+                showMessage('No QR code available', 'error');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            const fileName = `patient_qr_${window.currentQRData?.name || 'unknown'}.png`;
+            link.download = fileName;
+            link.href = qrImage.src;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            showMessage('✅ QR code downloaded!', 'success');
+        }
+        
+        // Redirect to scanner
+        function redirectToScanner() {
+            window.location.href = 'scan.html';
+        }
+        
+        // Show message
+        function showMessage(message, type) {
+            const statusDiv = document.getElementById('saveStatus');
+            if (!statusDiv) return;
+            
+            statusDiv.textContent = message;
+            statusDiv.className = type === 'success' ? 'success-message' : 'error-message';
+            statusDiv.classList.remove('hidden');
+            
+            // Auto hide after 5 seconds
+            setTimeout(() => {
+                statusDiv.classList.add('hidden');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
