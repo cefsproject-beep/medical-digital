@@ -63,12 +63,21 @@
             text-align: center;
         }
         
+        .video-wrapper {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            margin: 0 auto;
+            overflow: hidden;
+            border-radius: 10px;
+            border: 3px solid #3498db;
+            background: #000;
+        }
+        
         #video {
             width: 100%;
-            max-width: 400px;
-            border-radius: 10px;
-            border: 2px solid #3498db;
-            transform: scaleX(-1); /* Mirror for front camera */
+            height: 100%;
+            object-fit: cover;
         }
         
         #scan-status {
@@ -113,17 +122,12 @@
         
         .scanning-text {
             text-align: center;
-            color: #666;
-            margin-top: 10px;
-            font-size: 0.9rem;
-        }
-        
-        .scanner-active .scanning-text {
             color: #27ae60;
+            margin-top: 10px;
             font-weight: 600;
         }
         
-        .scanner-active .scanning-text::after {
+        .scanning-text::after {
             content: ' •';
             animation: dots 1.5s infinite;
         }
@@ -132,6 +136,30 @@
             0%, 20% { content: ' •'; }
             40% { content: ' • •'; }
             60%, 100% { content: ' • • •'; }
+        }
+        
+        .qr-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px dashed rgba(52, 152, 219, 0.5);
+            border-radius: 10px;
+            pointer-events: none;
+        }
+        
+        @media (max-width: 400px) {
+            .video-wrapper {
+                width: 280px;
+                height: 280px;
+            }
+            
+            .qr-guide {
+                width: 180px;
+                height: 180px;
+            }
         }
     </style>
     <!-- Include jsQR Library -->
@@ -165,11 +193,16 @@
         <!-- Camera Scanner -->
         <div id="scanner-container" class="card hidden">
             <h3 style="margin-bottom: 15px;">Camera Scanner</h3>
-            <video id="video" playsinline></video>
-            <div class="scanning-text" id="scanning-text">Ready to scan</div>
+            
+            <div class="video-wrapper">
+                <video id="video" playsinline></video>
+                <div class="qr-guide"></div>
+            </div>
+            
+            <div class="scanning-text" id="scanning-text">Scanning...</div>
             
             <p class="info">
-                <i class="fas fa-lightbulb"></i> Tip: Hold phone steady and ensure QR code is clear
+                <i class="fas fa-lightbulb"></i> Position QR code within the dashed area
             </p>
             
             <button class="btn btn-secondary" onclick="stopCamera()" style="margin-top: 15px;">
@@ -188,6 +221,7 @@
             <ul style="padding-left: 20px; color: #666;">
                 <li>Ensure good lighting</li>
                 <li>Hold phone steady</li>
+                <li>Position QR code within dashed area</li>
                 <li>Move closer if QR code is small</li>
                 <li>If scanning fails, try uploading an image</li>
             </ul>
@@ -212,12 +246,13 @@
                 cameraBtn.disabled = true;
                 cameraBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Camera...';
                 
-                // Request camera access
+                // Request camera access - REMOVED transform so tidak terbalik
                 const constraints = {
                     video: {
                         facingMode: "environment",
                         width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        height: { ideal: 1280 }, // Square aspect ratio
+                        aspectRatio: { ideal: 1 } // 1:1 square
                     },
                     audio: false
                 };
@@ -240,7 +275,6 @@
                         
                         // Update scanning text
                         document.getElementById('scanning-text').textContent = 'Scanning...';
-                        scannerContainer.classList.add('scanner-active');
                         isScanning = true;
                     }, 500);
                 };
@@ -269,21 +303,26 @@
             scanInterval = setInterval(() => {
                 if (!isScanning || !video.videoWidth) return;
                 
-                // Set canvas to video dimensions
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                // Set canvas to square dimensions (300x300)
+                const size = Math.min(video.videoWidth, video.videoHeight);
+                canvas.width = size;
+                canvas.height = size;
                 
-                // Draw video frame
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                // Calculate center crop for square
+                const offsetX = (video.videoWidth - size) / 2;
+                const offsetY = (video.videoHeight - size) / 2;
+                
+                // Draw square center of video
+                context.drawImage(video, offsetX, offsetY, size, size, 0, 0, size, size);
                 
                 // Get image data
-                const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                const imageData = context.getImageData(0, 0, size, size);
                 
-                // Try to decode QR code - FIXED: image.height -> imageData.height
+                // Decode QR code
                 const code = jsQR(
                     imageData.data, 
                     imageData.width, 
-                    imageData.height,  // <-- FIXED HERE
+                    imageData.height,
                     {
                         inversionAttempts: "dontInvert",
                     }
@@ -293,7 +332,7 @@
                     console.log("QR Code detected:", code.data);
                     handleScannedCode(code.data);
                 }
-            }, 300); // Scan every 300ms
+            }, 300);
         }
         
         // Handle file upload
@@ -317,12 +356,12 @@
                     const context = canvas.getContext('2d');
                     context.drawImage(img, 0, 0);
                     
-                    // Decode QR - FIXED: img.height -> canvas.height
+                    // Decode QR
                     const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
                     const code = jsQR(
                         imageData.data, 
                         imageData.width, 
-                        imageData.height,  // <-- FIXED HERE
+                        imageData.height,
                         {
                             inversionAttempts: "dontInvert",
                         }
@@ -383,13 +422,14 @@
             statusDiv.classList.remove('error');
             statusDiv.classList.add('success');
             
-            let countdown = 1; // Redirect in 1 second (lebih cepat!)
+            let countdown = 1;
             
             // Display success message
             statusContent.innerHTML = `
                 <div style="text-align: center;">
                     <i class="fas fa-check-circle fa-2x" style="color: #27ae60; margin-bottom: 10px;"></i>
                     <h3>QR Code Scanned!</h3>
+                    <p>Redirecting to patient information...</p>
                     <div class="countdown">Redirecting in <span id="countdown-number">${countdown}</span> second...</div>
                 </div>
             `;
@@ -445,8 +485,8 @@
             const scannerContainer = document.getElementById('scanner-container');
             if (!scannerContainer.classList.contains('hidden')) {
                 isScanning = true;
-                scannerContainer.classList.add('scanner-active');
                 document.getElementById('scanning-text').textContent = 'Scanning...';
+                startScanning();
             }
         }
         
@@ -468,7 +508,6 @@
             
             const scannerContainer = document.getElementById('scanner-container');
             scannerContainer.classList.add('hidden');
-            scannerContainer.classList.remove('scanner-active');
             
             // Re-enable camera button
             const cameraBtn = document.getElementById('camera-btn');
