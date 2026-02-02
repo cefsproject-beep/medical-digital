@@ -527,15 +527,55 @@
                     </button>
                 </div>
                 
+                <!-- Search and Sort Controls -->
+                <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; background: #f8f9fa; padding: 15px; border-radius: 10px;">
+                    <!-- Search Bar -->
+                    <div style="flex: 1; min-width: 200px;">
+                        <div style="position: relative;">
+                            <input 
+                                type="text" 
+                                id="searchPatient" 
+                                placeholder="Search patient by name..." 
+                                style="width: 100%; padding: 12px 40px 12px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.9rem;"
+                                onkeyup="filterPatients()"
+                            >
+                            <i class="fas fa-search" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: #666;"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Sort Options -->
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <select 
+                            id="sortOption" 
+                            style="padding: 10px 15px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 0.9rem; background: white; min-width: 150px;"
+                            onchange="sortPatients()"
+                        >
+                            <option value="newest">Sort by: Newest</option>
+                            <option value="oldest">Sort by: Oldest</option>
+                            <option value="name_asc">Sort by: Name (A-Z)</option>
+                            <option value="name_desc">Sort by: Name (Z-A)</option>
+                            <option value="bloodtype">Sort by: Blood Type</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Search Results Info -->
+                <div id="searchResultsInfo" class="hidden" style="margin-bottom: 15px; padding: 10px 15px; background: #e3f2fd; border-radius: 8px; color: #1565c0; font-size: 0.9rem;">
+                    <i class="fas fa-info-circle"></i> <span id="searchResultsText"></span>
+                </div>
+                
+                <!-- Loading -->
                 <div id="loadingPatients" class="loading">
                     <i class="fas fa-spinner fa-spin"></i> Loading patients...
                 </div>
                 
+                <!-- No Patients -->
                 <div id="noPatients" class="hidden" style="text-align: center; padding: 40px; color: #666;">
                     <i class="fas fa-user-injured fa-2x" style="margin-bottom: 15px;"></i>
                     <p>No patients found. Add your first patient!</p>
                 </div>
                 
+                <!-- Patients Table -->
                 <div id="patientsTableContainer" class="patients-table-container hidden">
                     <table>
                         <thead>
@@ -604,6 +644,9 @@
         let currentEditingId = null;
         let qrCodeInstance = null;
         let firebaseReady = false;
+        let allPatients = []; // Store all patients for filtering
+        let filteredPatients = []; // Store filtered patients
+        let currentSort = 'newest'; // Default sort
         
         // Initialize on load
         document.addEventListener('DOMContentLoaded', function() {
@@ -790,6 +833,7 @@
             if (qrImage) {
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
+
                 `);
                 printWindow.document.close();
                 printWindow.print();
@@ -804,10 +848,12 @@
             const noPatientsDiv = document.getElementById('noPatients');
             const tableContainer = document.getElementById('patientsTableContainer');
             const tableBody = document.getElementById('patientsTableBody');
+            const searchInfoDiv = document.getElementById('searchResultsInfo');
             
             loadingDiv.classList.remove('hidden');
             noPatientsDiv.classList.add('hidden');
             tableContainer.classList.add('hidden');
+            searchInfoDiv.classList.add('hidden');
             tableBody.innerHTML = '';
             
             try {
@@ -819,60 +865,152 @@
                 
                 if (querySnapshot.empty) {
                     noPatientsDiv.classList.remove('hidden');
+                    allPatients = [];
                     return;
                 }
                 
-                tableContainer.classList.remove('hidden');
-                let html = '';
-                
+                // Store all patients globally for filtering
+                allPatients = [];
                 querySnapshot.forEach((doc) => {
                     const data = doc.data();
-                    const id = doc.id;
-                    
-                    // Format date if exists
-                    let dateStr = 'N/A';
-                    if (data.createdAt) {
-                        const date = new Date(data.createdAt);
-                        dateStr = date.toLocaleDateString('en-US', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric'
-                        });
-                    }
-                    
-                    html += `
-                        <tr>
-                            <td>
-                                <strong>${data.name || 'Unknown'}</strong>
-                                <br><small style="color: #666; font-size: 0.8rem;">ID: ${data.id || 'N/A'}</small>
-                            </td>
-                            <td>${data.condition || 'N/A'}</td>
-                            <td><span style="color: #e74c3c; font-weight: bold;">${data.bloodType || 'N/A'}</span></td>
-                            <td>${data.nok || 'N/A'}</td>
-                            <td>
-                                <div class="action-buttons">
-                                    <button class="action-btn btn-edit" onclick="editPatient('${id}')">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <button class="action-btn btn-qr" onclick="showQRPopup('${id}', '${data.name || 'Patient'}')">
-                                        <i class="fas fa-qrcode"></i> QR
-                                    </button>
-                                    <button class="action-btn btn-delete" onclick="deletePatient('${id}', '${data.name || 'this patient'}')">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
+                    data.firebaseId = doc.id; // Add Firebase ID
+                    allPatients.push(data);
                 });
                 
-                tableBody.innerHTML = html;
+                // Apply sorting and render
+                applySortAndFilter();
                 
             } catch (error) {
                 console.error("❌ Error loading patients:", error);
                 loadingDiv.classList.add('hidden');
                 showMessage('Error loading patients: ' + error.message, 'error');
             }
+        }
+        
+        // Filter patients by name
+        function filterPatients() {
+            applySortAndFilter();
+        }
+        
+        // Sort patients
+        function sortPatients() {
+            applySortAndFilter();
+        }
+        
+        // Apply sorting and filtering
+        function applySortAndFilter() {
+            const searchTerm = document.getElementById('searchPatient').value.toLowerCase().trim();
+            const sortOption = document.getElementById('sortOption').value;
+            const searchInfoDiv = document.getElementById('searchResultsInfo');
+            const searchText = document.getElementById('searchResultsText');
+            
+            let patientsToDisplay = [...allPatients];
+            
+            // Apply search filter
+            if (searchTerm) {
+                patientsToDisplay = patientsToDisplay.filter(patient => {
+                    const patientName = (patient.name || '').toLowerCase();
+                    return patientName.includes(searchTerm);
+                });
+                
+                // Show search results info
+                if (patientsToDisplay.length > 0) {
+                    searchText.textContent = `Found ${patientsToDisplay.length} patient(s) matching "${searchTerm}"`;
+                    searchInfoDiv.classList.remove('hidden');
+                } else {
+                    searchInfoDiv.classList.add('hidden');
+                }
+            } else {
+                searchInfoDiv.classList.add('hidden');
+            }
+            
+            // Apply sorting
+            patientsToDisplay.sort((a, b) => {
+                switch(sortOption) {
+                    case 'newest':
+                        const dateA = new Date(a.createdAt || 0);
+                        const dateB = new Date(b.createdAt || 0);
+                        return dateB - dateA; // Newest first
+                        
+                    case 'oldest':
+                        const dateAOld = new Date(a.createdAt || 0);
+                        const dateBOld = new Date(b.createdAt || 0);
+                        return dateAOld - dateBOld; // Oldest first
+                        
+                    case 'name_asc':
+                        return (a.name || '').localeCompare(b.name || '');
+                        
+                    case 'name_desc':
+                        return (b.name || '').localeCompare(a.name || '');
+                        
+                    case 'bloodtype':
+                        return (a.bloodType || '').localeCompare(b.bloodType || '');
+                        
+                    default:
+                        return 0;
+                }
+            });
+            
+            // Render the table
+            renderPatientsTable(patientsToDisplay);
+        }
+        
+        // Render patients table
+        function renderPatientsTable(patients) {
+            const noPatientsDiv = document.getElementById('noPatients');
+            const tableContainer = document.getElementById('patientsTableContainer');
+            const tableBody = document.getElementById('patientsTableBody');
+            
+            if (patients.length === 0) {
+                tableContainer.classList.add('hidden');
+                const searchTerm = document.getElementById('searchPatient').value.trim();
+                
+                if (searchTerm) {
+                    noPatientsDiv.innerHTML = `
+                        <i class="fas fa-search fa-2x" style="margin-bottom: 15px;"></i>
+                        <p>No patients found matching "${searchTerm}"</p>
+                    `;
+                }
+                noPatientsDiv.classList.remove('hidden');
+                return;
+            }
+            
+            tableContainer.classList.remove('hidden');
+            noPatientsDiv.classList.add('hidden');
+            
+            let html = '';
+            
+            patients.forEach((data) => {
+                // Escape quotes for onclick
+                const safeName = (data.name || 'Patient').replace(/'/g, "\\'");
+                
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${data.name || 'Unknown'}</strong>
+                            <br><small style="color: #666; font-size: 0.8rem;">ID: ${data.id || 'N/A'}</small>
+                        </td>
+                        <td>${data.condition || 'N/A'}</td>
+                        <td><span style="color: #e74c3c; font-weight: bold;">${data.bloodType || 'N/A'}</span></td>
+                        <td>${data.nok || 'N/A'}</td>
+                        <td>
+                            <div class="action-buttons">
+                                <button class="action-btn btn-edit" onclick="editPatient('${data.firebaseId}')">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="action-btn btn-qr" onclick="showQRPopup('${data.firebaseId}', '${safeName}')">
+                                    <i class="fas fa-qrcode"></i> QR
+                                </button>
+                                <button class="action-btn btn-delete" onclick="deletePatient('${data.firebaseId}', '${safeName}')">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            tableBody.innerHTML = html;
         }
         
         // Edit patient
