@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical QR System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #3498db 0%, #2c3e50 100%);
+            color: white;
+            padding: 20px 15px;
+            text-align: center;
+        }
+        
+        .container {
+            padding: 20px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 0;
+            text-align: center;
+            text-decoration: none;
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+        }
+        
+        #scanner-container {
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        #video {
+            width: 100%;
+            max-width: 400px;
+            border-radius: 10px;
+            border: 2px solid #3498db;
+            transform: scaleX(-1); /* Mirror for front camera */
+        }
+        
+        #scan-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 8px;
+        }
+        
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .countdown {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #3498db;
+            margin-top: 10px;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        #scan-indicator {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 250px;
+            border: 3px solid #27ae60;
+            border-radius: 10px;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .scanner-active #scan-indicator {
+            display: block;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { border-color: #27ae60; }
+            50% { border-color: #2ecc71; }
+            100% { border-color: #27ae60; }
+        }
+        
+        .video-container {
+            position: relative;
+            display: inline-block;
+        }
+    </style>
+    <!-- Include jsQR Library -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>Scan Patient QR Code</h1>
+        <p>Point camera at QR code to scan</p>
+    </div>
+    
+    <div class="container">
+        <!-- Scan Options -->
+        <div class="card">
+            <h2 style="margin-bottom: 20px; color: #2c3e50;">Scan Options</h2>
+            
+            <button class="btn" onclick="startCameraScan()" id="camera-btn">
+                <i class="fas fa-camera"></i> Scan Using Camera
+            </button>
+            
+            <button class="btn btn-secondary" onclick="openFileUpload()">
+                <i class="fas fa-image"></i> Upload QR Image
+            </button>
+            <input type="file" id="fileInput" accept="image/*" style="display:none;" onchange="handleFileUpload(event)">
+            
+            <a href="index.html" class="btn" style="background: #27ae60; margin-top: 20px;">
+                <i class="fas fa-arrow-left"></i> Back to Add Patient
+            </a>
+        </div>
+        
+        <!-- Camera Scanner -->
+        <div id="scanner-container" class="card hidden">
+            <h3 style="margin-bottom: 15px;">Camera Scanner</h3>
+            <div class="video-container">
+                <video id="video" playsinline></video>
+                <div id="scan-indicator"></div>
+            </div>
+            <p class="info" id="scan-hint">
+                <i class="fas fa-lightbulb"></i> Position QR code within the green box
+            </p>
+            <button class="btn btn-secondary" onclick="stopCamera()" style="margin-top: 15px;">
+                <i class="fas fa-times"></i> Stop Camera
+            </button>
+        </div>
+        
+        <!-- Scan Status -->
+        <div id="scan-status" class="card hidden">
+            <div id="status-content"></div>
+        </div>
+        
+        <!-- Debug Info (optional - boleh hide dalam production) -->
+        <div id="debug-info" class="card hidden" style="font-size: 0.8rem; color: #666;">
+            <h4>Debug Info:</h4>
+            <div id="debug-content"></div>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="card">
+            <h3 style="margin-bottom: 15px;">Tips for Better Scanning:</h3>
+            <ul style="padding-left: 20px; color: #666;">
+                <li>Ensure good lighting</li>
+                <li>Hold phone steady</li>
+                <li>Position QR code within the green box</li>
+                <li>Keep QR code parallel to camera</li>
+                <li>If scanning fails, try uploading an image instead</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let videoStream = null;
+        let scanInterval = null;
+        let lastScannedCode = null;
+        let redirectCountdown = null;
+        let isScanning = false;
+        
+        // Start camera scan
+        async function startCameraScan() {
+            try {
+                const scannerContainer = document.getElementById('scanner-container');
+                const cameraBtn = document.getElementById('camera-btn');
+                
+                scannerContainer.classList.remove('hidden');
+                cameraBtn.disabled = true;
+                cameraBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Camera...';
+                
+                // Request camera access with better constraints
+                const constraints = {
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                videoStream = stream;
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                
+                // Wait for video to be ready
+                video.onloadedmetadata = () => {
+                    video.play();
+                    
+                    // Start scanning after video is playing
+                    setTimeout(() => {
+                        startScanning();
+                        cameraBtn.innerHTML = '<i class="fas fa-camera"></i> Scan Using Camera';
+                        cameraBtn.disabled = false;
+                        
+                        // Add scanning class for visual indicator
+                        document.querySelector('.video-container').classList.add('scanner-active');
+                        isScanning = true;
+                    }, 1000);
+                };
+                
+            } catch (error) {
+                console.error("Camera error:", error);
+                showError("Camera error: " + error.message);
+                
+                const cameraBtn = document.getElementById('camera-btn');
+                cameraBtn.innerHTML = '<i class="fas fa-camera"></i> Scan Using Camera';
+                cameraBtn.disabled = false;
+            }
+        }
+        
+        // Start scanning loop
+        function startScanning() {
+            const video = document.getElementById('video');
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Clear any existing interval
+            if (scanInterval) {
+                clearInterval(scanInterval);
+            }
+            
+            scanInterval = setInterval(() => {
+                if (!isScanning) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA && video.videoWidth > 0) {
+                    // Set canvas dimensions to video dimensions
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Draw video frame to canvas
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    // Get image data
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    // Try to decode QR code
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    // Update debug info
+                    updateDebugInfo(`Scanning... Video: ${canvas.width}x${canvas.height}`);
+                    
+                    if (code) {
+                        console.log("QR Code detected:", code.data);
+                        updateDebugInfo(`QR Found: ${code.data.substring(0, 50)}...`);
+                        handleScannedCode(code.data);
+                    }
+                }
+            }, 200); // Scan every 200ms (faster)
+        }
+        
+        // Handle file upload
+        function openFileUpload() {
+            document.getElementById('fileInput').click();
+        }
+        
+        async function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const img = new Image();
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                img.onload = function() {
+                    // Create canvas
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(img, 0, 0);
+                    
+                    // Decode QR
+                    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    if (code) {
+                        handleScannedCode(code.data);
+                    } else {
+                        showError("No QR code found in image. Please try another image.");
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        // Handle scanned QR code
+        function handleScannedCode(qrData) {
+            try {
+                // Prevent duplicate scanning
+                if (qrData === lastScannedCode) return;
+                lastScannedCode = qrData;
+                
+                console.log("QR Data:", qrData);
+                
+                // Parse QR data
+                const data = JSON.parse(qrData);
+                
+                if (!data.firebaseId) {
+                    showError("Invalid QR code format. Missing firebaseId");
+                    return;
+                }
+                
+                // Stop scanning
+                isScanning = false;
+                document.querySelector('.video-container').classList.remove('scanner-active');
+                
+                // Stop camera if active
+                if (videoStream) {
+                    stopCamera();
+                }
+                
+                // Show success message with countdown
+                showSuccessAndRedirect(data);
+                
+            } catch (error) {
+                console.error("QR parse error:", error);
+                showError("Invalid QR code format. Please ensure it's a valid Medical QR code.");
+            }
+        }
+        
+        // Show success and auto redirect
+        function showSuccessAndRedirect(data) {
+            const statusDiv = document.getElementById('scan-status');
+            const statusContent = document.getElementById('status-content');
+            
+            // Show status container
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.remove('error');
+            statusDiv.classList.add('success');
+            
+            let countdown = 2; // Redirect in 2 seconds
+            
+            // Display success message
+            statusContent.innerHTML = `
+                <div style="text-align: center;">
+                    <i class="fas fa-check-circle fa-2x" style="color: #27ae60; margin-bottom: 10px;"></i>
+                    <h3>QR Code Scanned Successfully!</h3>
+                    <p>Patient ID: ${data.patientId || 'N/A'}</p>
+                    <div class="countdown">Redirecting in <span id="countdown-number">${countdown}</span> seconds...</div>
+                </div>
+            `;
+            
+            // Start countdown
+            redirectCountdown = setInterval(() => {
+                countdown--;
+                document.getElementById('countdown-number').textContent = countdown;
+                
+                if (countdown <= 0) {
+                    clearInterval(redirectCountdown);
+                    redirectToPatient(data.firebaseId);
+                }
+            }, 1000);
+        }
+        
+        // Redirect to patient page
+        function redirectToPatient(firebaseId) {
+            window.location.href = `patient.html?id=${firebaseId}`;
+        }
+        
+        // Show error
+        function showError(message) {
+            const statusDiv = document.getElementById('scan-status');
+            const statusContent = document.getElementById('status-content');
+            
+            statusDiv.classList.remove('hidden');
+            statusDiv.classList.remove('success');
+            statusDiv.classList.add('error');
+            statusContent.innerHTML = `
+                <div style="text-align: center;">
+                    <i class="fas fa-exclamation-circle fa-2x" style="color: #e74c3c; margin-bottom: 10px;"></i>
+                    <h3>Scan Failed</h3>
+                    <p>${message}</p>
+                    <button class="btn" onclick="retryScan()" style="margin-top: 15px;">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
+        
+        // Update debug info
+        function updateDebugInfo(message) {
+            const debugDiv = document.getElementById('debug-info');
+            const debugContent = document.getElementById('debug-content');
+            
+            // Uncomment untuk show debug info
+            // debugDiv.classList.remove('hidden');
+            debugContent.textContent = message + ' | ' + new Date().toLocaleTimeString();
+        }
+        
+        // Retry scanning
+        function retryScan() {
+            document.getElementById('scan-status').classList.add('hidden');
+            lastScannedCode = null;
+            isScanning = true;
+            
+            if (redirectCountdown) {
+                clearInterval(redirectCountdown);
+                redirectCountdown = null;
+            }
+            
+            // Restart camera if it was active
+            const scannerContainer = document.getElementById('scanner-container');
+            if (!scannerContainer.classList.contains('hidden')) {
+                document.querySelector('.video-container').classList.add('scanner-active');
+                startScanning();
+            }
+        }
+        
+        // Stop camera
+        function stopCamera() {
+            isScanning = false;
+            
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => {
+                    track.stop();
+                });
+                videoStream = null;
+            }
+            
+            if (scanInterval) {
+                clearInterval(scanInterval);
+                scanInterval = null;
+            }
+            
+            document.getElementById('scanner-container').classList.add('hidden');
+            document.querySelector('.video-container').classList.remove('scanner-active');
+            
+            // Re-enable camera button
+            const cameraBtn = document.getElementById('camera-btn');
+            cameraBtn.disabled = false;
+            cameraBtn.innerHTML = '<i class="fas fa-camera"></i> Scan Using Camera';
+        }
+        
+        // Clean up on page leave
+        window.addEventListener('beforeunload', stopCamera);
+        
+        // Auto-start camera if parameter exists
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('auto') === 'true') {
+            setTimeout(startCameraScan, 1000);
+        }
+        
+        // Test with sample QR (for debugging)
+        function testWithSampleQR() {
+            const sampleData = {
+                firebaseId: "test-patient-123",
+                patientId: "PAT-TEST-001",
+                hasPassword: true
+            };
+            handleScannedCode(JSON.stringify(sampleData));
+        }
+    </script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</body>
+</html>
